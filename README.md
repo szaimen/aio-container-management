@@ -1,2 +1,2 @@
-# aio-borgbackup-viewer
-Borg backup viewer container used in https://github.com/nextcloud/all-in-one/tree/main/community-containers/borgbackup-viewer
+# aio-container-management
+Container management container used in https://github.com/nextcloud/all-in-one/tree/main/community-containers/container-management

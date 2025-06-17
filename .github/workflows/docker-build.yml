@@ -39,5 +39,5 @@ jobs:
           context: './'
           no-cache: true
           file: 'Dockerfile'
-          tags: ghcr.io/szaimen/aio-borgbackup-viewer:${{ github.event.inputs.tagName }}
+          tags: ghcr.io/szaimen/aio-container-management:${{ github.event.inputs.tagName }}
           provenance: false
