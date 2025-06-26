@@ -5,6 +5,7 @@ FROM docker:28.2.2-cli AS docker
 FROM jlesage/baseimage-gui:alpine-3.21-v4
 
 COPY --chmod=775 startapp.sh /startapp.sh
+COPY --chmod=775 /scripts/* /
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
 
 # Set the name of the application.
@@ -12,6 +13,13 @@ RUN set-cont-env APP_NAME "Nextcloud AIO Container Management"
 
 # hadolint ignore=DL3002
 USER root
+
+# hadolint ignore=DL3018
+RUN set -ex; \
+    \
+    apk upgrade --no-cache -a; \
+    apk add --no-cache \
+        bash sudo;
 
 ENV USER_ID=0 \
     GROUP_ID=0 \
