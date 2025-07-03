@@ -11,6 +11,11 @@ BASE_DN="dc=${NC_DOMAIN//./,dc=}"
 # Create a new empty ldap config
 CONF_NAME=$(docker exec --user www-data nextcloud-aio-nextcloud php occ ldap:create-empty-config -p)
 
+if [ -z "$CONF_NAME" ]; then
+    echo "CONF_NAME is empty. Most likely the ldap app is not enabled."
+    exit 1
+fi
+
 # Check that the base DN matches your domain and retrieve your configuration name
 echo "Base DN: $BASE_DN, Config name: $CONF_NAME"
 
