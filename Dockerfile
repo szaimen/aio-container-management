@@ -19,7 +19,7 @@ RUN set -ex; \
     \
     apk upgrade --no-cache -a; \
     apk add --no-cache \
-        bash sudo xterm;
+        bash sudo xterm grep;
 
 ENV USER_ID=0 \
     GROUP_ID=0 \
