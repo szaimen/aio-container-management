@@ -1,5 +1,5 @@
 # Docker CLI is a requirement
-FROM docker:28.5.0-cli AS docker
+FROM docker:28.5.1-cli AS docker
 
 # The actual base image
 FROM jlesage/baseimage-gui:alpine-3.21-v4
