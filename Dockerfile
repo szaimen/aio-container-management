@@ -20,7 +20,7 @@ ENV USER_ID=0 \
     HOME=/root
 
 # hadolint ignore=DL3002
-USER root
+USER 0
 
 # Needed for Nextcloud AIO so that image cleanup can work. 
 # Unfortunately, this needs to be set in the Dockerfile in order to work.
