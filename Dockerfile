@@ -6,6 +6,7 @@ FROM jlesage/baseimage-gui:alpine-3.21-v4
 
 COPY --chmod=775 startapp.sh /startapp.sh
 COPY --chmod=775 /scripts/* /
+COPY --chmod=775 rootfs/ /
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
 
 # Set the name of the application.
