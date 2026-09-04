@@ -1,0 +1,150 @@
+name: Update Jlesage Baseimage GUI
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 12 * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-baseimage-gui
+  cancel-in-progress: true
+
+jobs:
+  update-baseimage-gui:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Update Dockerfile if a newer baseimage tag exists
+        id: update
+        env:
+          DOCKERFILE_PATH: Dockerfile
+          IMAGE_NAME: jlesage/baseimage-gui
+        run: |
+          python <<'PY'
+          import json
+          import os
+          import pathlib
+          import re
+          import urllib.request
+
+          dockerfile_path = pathlib.Path(os.environ["DOCKERFILE_PATH"])
+          image_name = os.environ["IMAGE_NAME"]
+          content = dockerfile_path.read_text(encoding="utf-8")
+
+          pattern = re.compile(rf"^(FROM\s+{re.escape(image_name)}:)(\S+)$", re.MULTILINE)
+          match = pattern.search(content)
+          if match is None:
+              raise SystemExit(f"Could not find a FROM line for {image_name}.")
+
+          current_tag = match.group(2)
+          tag_prefix, separator, _ = current_tag.rpartition("-v")
+          if separator == "":
+              raise SystemExit(f"Unsupported tag format: {current_tag}")
+
+          def request(url: str):
+              return urllib.request.Request(
+                  url,
+                  headers={
+                      "Accept": "application/json",
+                      "User-Agent": "aio-container-management-baseimage-updater",
+                  },
+              )
+
+          def version_key(tag: str):
+              version = tag.removeprefix(f"{tag_prefix}-v")
+              return tuple(int(part) for part in version.split("."))
+
+          tags = []
+          next_url = f"https://hub.docker.com/v2/repositories/{image_name}/tags?page_size=100"
+          while next_url:
+              with urllib.request.urlopen(request(next_url)) as response:
+                  payload = json.load(response)
+              tags.extend(result["name"] for result in payload["results"])
+              next_url = payload["next"]
+
+          matching_tags = [tag for tag in tags if tag.startswith(f"{tag_prefix}-v")]
+          if not matching_tags:
+              raise SystemExit(f"No matching tags found for prefix {tag_prefix}-v")
+
+          latest_tag = max(matching_tags, key=version_key)
+          updated = latest_tag != current_tag
+
+          if updated:
+              content = pattern.sub(lambda current_match: f"{current_match.group(1)}{latest_tag}", content, count=1)
+              dockerfile_path.write_text(content, encoding="utf-8")
+
+          github_output = pathlib.Path(os.environ["GITHUB_OUTPUT"])
+          with github_output.open("a", encoding="utf-8") as output:
+              output.write(f"current_tag={current_tag}\n")
+              output.write(f"latest_tag={latest_tag}\n")
+              output.write(f"updated={'true' if updated else 'false'}\n")
+          PY
+
+      - name: Configure git
+        if: steps.update.outputs.updated == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and push update branch
+        if: steps.update.outputs.updated == 'true'
+        env:
+          BRANCH_NAME: automation/update-baseimage-gui
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git switch -C "$BRANCH_NAME"
+          git add Dockerfile
+          git commit -m "chore(deps): update jlesage/baseimage-gui to ${{ steps.update.outputs.latest_tag }}"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force --set-upstream origin "$BRANCH_NAME"
+
+      - name: Create or update pull request
+        if: steps.update.outputs.updated == 'true'
+        env:
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          BRANCH_NAME: automation/update-baseimage-gui
+          CURRENT_TAG: ${{ steps.update.outputs.current_tag }}
+          GH_TOKEN: ${{ github.token }}
+          LATEST_TAG: ${{ steps.update.outputs.latest_tag }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          pr_number="$(gh pr list \
+            --base "$BASE_BRANCH" \
+            --head "${REPOSITORY_OWNER}:${BRANCH_NAME}" \
+            --json number \
+            --jq '.[0].number // ""')"
+
+          pr_body="$(cat <<EOF
+          ## Summary
+          - update \`jlesage/baseimage-gui\` from \`${CURRENT_TAG}\` to \`${LATEST_TAG}\`
+          - keep the current Alpine release track while refreshing the embedded baseimage version
+
+          ## Notes
+          - generated by the scheduled baseimage update workflow because Dependabot does not handle this tag format correctly
+          EOF
+          )"
+
+          if [ -n "$pr_number" ]; then
+            gh pr edit "$pr_number" \
+              --title "chore(deps): update jlesage/baseimage-gui to ${LATEST_TAG}" \
+              --body "$pr_body" \
+              --add-label dependencies
+          else
+            gh pr create \
+              --base "$BASE_BRANCH" \
+              --head "$BRANCH_NAME" \
+              --title "chore(deps): update jlesage/baseimage-gui to ${LATEST_TAG}" \
+              --body "$pr_body" \
+              --label dependencies
+          fi
