@@ -2,7 +2,7 @@
 FROM docker:29.7.2-cli AS docker
 
 # The actual base image
-FROM jlesage/baseimage-gui:alpine-3.24-v4
+FROM jlesage/baseimage-gui:alpine-3.24-v4.13.2
 
 COPY --chmod=775 startapp.sh /startapp.sh
 COPY --chmod=775 /scripts/* /
