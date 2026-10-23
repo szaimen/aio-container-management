@@ -2,7 +2,7 @@
 FROM docker:29.9.1-cli AS docker
 
 # The actual base image
-FROM jlesage/baseimage-gui:alpine-3.24-v4.14.0
+FROM jlesage/baseimage-gui:alpine-3.24-v4
 
 COPY --chmod=775 startapp.sh /startapp.sh
 COPY --chmod=775 /scripts/* /
@@ -10,7 +10,9 @@ COPY --chmod=775 rootfs/ /
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
 
 # Set the name of the application.
-RUN set-cont-env APP_NAME "Nextcloud AIO Container Management" && \
+RUN set -ex; \
+    apk upgrade --no-cache -a; \
+    set-cont-env APP_NAME "Nextcloud AIO Container Management" && \
     add-pkg bash sudo xterm grep
 
 ENV USER_ID=0 \
